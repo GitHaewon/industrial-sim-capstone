@@ -23,6 +23,9 @@ Thumbs.db
 *.bag
 *.db3
 
+# Keep the project concept video in the repository.
+!media/industrial_sim_story_example.mp4
+
 # Local Codex workspace
 /outputs/
 /work/
