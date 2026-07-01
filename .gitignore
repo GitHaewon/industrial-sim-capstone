@@ -1,0 +1,28 @@
+# ROS 2 / colcon
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large generated files
+*.mp4
+*.zip
+*.bag
+*.db3
+
+# Local Codex workspace
+/outputs/
+/work/
