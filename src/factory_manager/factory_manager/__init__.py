@@ -1,0 +1,1 @@
+"""Factory process coordination package."""

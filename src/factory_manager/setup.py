@@ -19,6 +19,9 @@ setup(
     license='Apache License 2.0',
     tests_require=['pytest'],
     entry_points={
-        'console_scripts': [],
+        'console_scripts': [
+            'factory_manager = factory_manager.factory_manager:main',
+            'dashboard_node = factory_manager.dashboard_node:main',
+        ],
     },
 )

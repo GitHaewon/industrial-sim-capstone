@@ -26,8 +26,8 @@ IDLE
 | `/arm/task_complete` | `std_msgs/msg/Bool` | 로봇팔 작업 완료 |
 | `/box/item_count` | `std_msgs/msg/Int32` | 현재 박스 적재 수량 |
 | `/box/ready` | `std_msgs/msg/Bool` | 박스 적재 완료 |
-| `/amr/start_delivery` | `std_msgs/msg/Bool` | AMR 운송 시작 |
-| `/amr/delivery_complete` | `std_msgs/msg/Bool` | 배송 완료 |
+| `/amr/start_delivery` | `std_msgs/msg/Bool` | A/B/C 적재 상자 운송 시작 |
+| `/amr/delivery_complete` | `std_msgs/msg/Bool` | 세 상자의 구역 배송 완료 |
 | `/factory/state` | `std_msgs/msg/String` | 전체 공정 상태 |
 
 인터페이스를 변경할 경우 관련 담당자와 합의한 후 이 문서를 먼저 수정한다.
