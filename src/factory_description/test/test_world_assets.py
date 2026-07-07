@@ -88,6 +88,9 @@ def test_world_contains_sorting_cell_components():
         assert mobile_bin.find(
             "./plugin[@name='gz::sim::systems::DiffDrive']"
         ) is not None
+        lidar = mobile_bin.find("./link/sensor[@type='gpu_lidar']")
+        assert lidar is not None
+        assert lidar.findtext('topic') == f'/model/{bin_name}/scan'
         cargo_joint = mobile_bin.find(
             "./plugin[@name='gz::sim::systems::DetachableJoint']"
         )
@@ -125,13 +128,15 @@ def test_launch_uses_ros_gz_sim():
     assert "executable='factory_manager'" in launch_text
     assert "executable='dashboard_node'" in launch_text
     assert "package='nav2_controller'" in launch_text
+    assert "package='nav2_amcl'" in launch_text
     assert "package='nav2_planner'" in launch_text
     assert "executable='bt_navigator'" in launch_text
     assert '/factory/camera/depth_image' in launch_text
     assert '/world/factory_test/set_pose' in launch_text
-    assert '/model/bin_a_red/odometry' in launch_text
-    assert '/model/bin_b_green/odometry' in launch_text
-    assert '/model/bin_c_blue/odometry' in launch_text
+    assert '/model/bin_a_red/scan' in launch_text
+    assert '/model/bin_b_green/scan' in launch_text
+    assert '/model/bin_c_blue/scan' in launch_text
+    assert '/model/bin_a_red/wheel_odometry' in launch_text
 
 
 def test_sorting_bins_do_not_overlap():

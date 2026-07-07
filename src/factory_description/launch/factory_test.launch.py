@@ -71,27 +71,51 @@ def generate_launch_description():
             '@geometry_msgs/msg/Twist]gz.msgs.Twist',
             '/model/bin_a_red/ground_truth_odometry'
             '@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+            '/model/bin_a_red/odometry'
+            '@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+            '/model/bin_a_red/scan'
+            '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
             '/model/bin_b_green/cmd_vel'
             '@geometry_msgs/msg/Twist]gz.msgs.Twist',
             '/model/bin_b_green/ground_truth_odometry'
             '@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+            '/model/bin_b_green/odometry'
+            '@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+            '/model/bin_b_green/scan'
+            '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
             '/model/bin_c_blue/cmd_vel'
             '@geometry_msgs/msg/Twist]gz.msgs.Twist',
             '/model/bin_c_blue/ground_truth_odometry'
             '@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+            '/model/bin_c_blue/odometry'
+            '@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+            '/model/bin_c_blue/scan'
+            '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
         ],
         remappings=[
             (
                 '/model/bin_a_red/ground_truth_odometry',
+                '/model/bin_a_red/ground_truth',
+            ),
+            (
                 '/model/bin_a_red/odometry',
+                '/model/bin_a_red/wheel_odometry',
             ),
             (
                 '/model/bin_b_green/ground_truth_odometry',
+                '/model/bin_b_green/ground_truth',
+            ),
+            (
                 '/model/bin_b_green/odometry',
+                '/model/bin_b_green/wheel_odometry',
             ),
             (
                 '/model/bin_c_blue/ground_truth_odometry',
+                '/model/bin_c_blue/ground_truth',
+            ),
+            (
                 '/model/bin_c_blue/odometry',
+                '/model/bin_c_blue/wheel_odometry',
             ),
         ],
         output='screen',
@@ -151,6 +175,14 @@ def generate_launch_description():
             nav2_params,
             {'yaml_filename': str(map_yaml)},
         ],
+        output='screen',
+    )
+
+    amcl = Node(
+        package='nav2_amcl',
+        executable='amcl',
+        name='amcl',
+        parameters=[nav2_params],
         output='screen',
     )
 
@@ -225,6 +257,7 @@ def generate_launch_description():
         random_spawner,
         vision_node,
         map_server,
+        amcl,
         controller_server,
         planner_server,
         behavior_server,

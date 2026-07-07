@@ -6,14 +6,22 @@ import time
 
 from action_msgs.msg import GoalStatus
 from amr_control.navigation_policy import retry_allowed
-from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
+from geometry_msgs.msg import (
+    PoseStamped,
+    PoseWithCovarianceStamped,
+    TransformStamped,
+    Twist,
+)
 from nav2_msgs.action import NavigateToPose
 from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.time import Time
+from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool, String
-from tf2_ros import TransformBroadcaster
+from tf2_ros import StaticTransformBroadcaster, TransformBroadcaster
 
 
 def normalize_angle(angle):
@@ -31,13 +39,22 @@ class BoxCarrier:
     initial_y: float
     initial_yaw: float
     goals: tuple
-    odometry: Odometry | None = None
+    ground_truth: Odometry | None = None
+    wheel_odometry: Odometry | None = None
+    scan: LaserScan | None = None
+    localized_pose: tuple | None = None
     goal_index: int = 0
     arrived: bool = False
 
     def world_pose(self):
-        """Return Gazebo ground-truth odometry in the map frame."""
-        pose = self.odometry.pose.pose
+        """Return the AMCL pose, falling back to truth before localization."""
+        if self.localized_pose is not None:
+            return self.localized_pose
+        return self.truth_pose()
+
+    def truth_pose(self):
+        """Return Gazebo ground truth used only to seed and verify AMCL."""
+        pose = self.ground_truth.pose.pose
         yaw = atan2(
             2.0 * (
                 pose.orientation.w * pose.orientation.z
@@ -57,14 +74,14 @@ class AmrController(Node):
     CARRIERS = (
         (
             'bin_a_red', 'A', 0.5, -2.95, pi,
-            ((-5.2, -7.55, -pi / 2.0),),
+            ((-5.2, -7.0, -pi / 2.0),),
         ),
         (
             'bin_b_green', 'B', 2.75, -1.5, 0.0,
             (
                 (4.5, -1.5, 0.0),
                 (4.5, -5.8, -pi / 2.0),
-                (0.0, -7.55, -pi / 2.0),
+                (0.0, -7.0, -pi / 2.0),
             ),
         ),
         (
@@ -72,7 +89,7 @@ class AmrController(Node):
             (
                 (2.0, -4.8, -pi / 2.0),
                 (5.2, -6.4, -0.5),
-                (5.2, -7.55, -pi / 2.0),
+                (5.2, -7.0, -pi / 2.0),
             ),
         ),
     )
@@ -107,6 +124,11 @@ class AmrController(Node):
         self.best_distance = float('inf')
         self.last_progress_at = 0.0
         self.progress_pose = None
+        self.localization_pending = False
+        self.localization_requested_at = 0.0
+        self.localization_last_publish_at = 0.0
+        self.localization_candidate = None
+        self.localization_candidate_since = 0.0
 
         self.command_publishers = {}
         for carrier in self.carriers:
@@ -115,16 +137,44 @@ class AmrController(Node):
             )
             self.create_subscription(
                 Odometry,
-                f'/model/{carrier.model}/odometry',
+                f'/model/{carrier.model}/ground_truth',
                 lambda message, name=carrier.model:
-                self._odometry_callback(message, name),
+                self._ground_truth_callback(message, name),
                 10,
+            )
+            self.create_subscription(
+                Odometry,
+                f'/model/{carrier.model}/wheel_odometry',
+                lambda message, name=carrier.model:
+                self._wheel_odometry_callback(message, name),
+                20,
+            )
+            self.create_subscription(
+                LaserScan,
+                f'/model/{carrier.model}/scan',
+                lambda message, name=carrier.model:
+                self._scan_callback(message, name),
+                qos_profile_sensor_data,
             )
 
         self.nav_odometry_publisher = self.create_publisher(
             Odometry, '/nav/odom', 20
         )
+        self.scan_publisher = self.create_publisher(
+            LaserScan, '/scan', qos_profile_sensor_data
+        )
+        self.initial_pose_publisher = self.create_publisher(
+            PoseWithCovarianceStamped, '/initialpose', 10
+        )
         self.tf_broadcaster = TransformBroadcaster(self)
+        self.static_tf_broadcaster = StaticTransformBroadcaster(self)
+        self._publish_lidar_transform()
+        self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/amcl_pose',
+            self._amcl_pose_callback,
+            10,
+        )
         self.create_subscription(
             Twist, '/nav/cmd_vel', self._nav_command_callback, 20
         )
@@ -145,7 +195,7 @@ class AmrController(Node):
         )
         self.create_timer(0.05, self._update)
         self.get_logger().info(
-            'Nav2 box coordinator ready (retry limit: '
+            'Nav2 LiDAR/AMCL box coordinator ready (retry limit: '
             f'{self.max_retries})'
         )
 
@@ -156,56 +206,173 @@ class AmrController(Node):
     def _start_callback(self, message):
         if not message.data or self.mode != 'WAITING':
             return
-        if any(carrier.odometry is None for carrier in self.carriers):
-            self._terminal_failure('ODOMETRY_NOT_READY')
+        if any(
+            carrier.ground_truth is None
+            or carrier.wheel_odometry is None
+            or carrier.scan is None
+            for carrier in self.carriers
+        ):
+            self._terminal_failure('SENSOR_DATA_NOT_READY')
             return
 
         self.active_index = 0
         for carrier in self.carriers:
             carrier.goal_index = 0
             carrier.arrived = False
-        self.mode = 'SWITCHING'
-        self.next_goal_at = time.monotonic() + 0.8
+        if self.active_carrier.localized_pose is None:
+            self.mode = 'LOCALIZING'
+            self._request_localization()
+        else:
+            self.mode = 'SWITCHING'
+            self.next_goal_at = time.monotonic() + 0.8
         self.failed_attempts = 0
         self.state_publisher.publish(String(data='NAV2_STARTING:A'))
         self.get_logger().info(
             'Nav2 delivery started: A/B/C -> left/center/right doors'
         )
 
-    def _odometry_callback(self, message, model):
-        carrier = next(
-            item for item in self.carriers if item.model == model
-        )
-        carrier.odometry = message
-        if carrier is self.active_carrier:
-            self._publish_nav_pose(carrier)
+    def _carrier_for_model(self, model):
+        return next(item for item in self.carriers if item.model == model)
 
-    def _publish_nav_pose(self, carrier):
-        x, y, yaw = carrier.world_pose()
+    def _ground_truth_callback(self, message, model):
+        self._carrier_for_model(model).ground_truth = message
+
+    def _wheel_odometry_callback(self, message, model):
+        carrier = self._carrier_for_model(model)
+        carrier.wheel_odometry = message
+        if carrier is not self.active_carrier:
+            return
+
         stamp = self.get_clock().now().to_msg()
-        orientation_z = sin(yaw / 2.0)
-        orientation_w = cos(yaw / 2.0)
-
-        odometry = Odometry()
+        odometry = message
         odometry.header.stamp = stamp
-        odometry.header.frame_id = 'map'
+        odometry.header.frame_id = 'odom'
         odometry.child_frame_id = 'base_link'
-        odometry.pose.pose.position.x = x
-        odometry.pose.pose.position.y = y
-        odometry.pose.pose.orientation.z = orientation_z
-        odometry.pose.pose.orientation.w = orientation_w
-        odometry.twist = carrier.odometry.twist
         self.nav_odometry_publisher.publish(odometry)
 
         transform = TransformStamped()
         transform.header.stamp = stamp
-        transform.header.frame_id = 'map'
+        transform.header.frame_id = 'odom'
         transform.child_frame_id = 'base_link'
-        transform.transform.translation.x = x
-        transform.transform.translation.y = y
-        transform.transform.rotation.z = orientation_z
-        transform.transform.rotation.w = orientation_w
+        transform.transform.translation.x = odometry.pose.pose.position.x
+        transform.transform.translation.y = odometry.pose.pose.position.y
+        transform.transform.translation.z = odometry.pose.pose.position.z
+        transform.transform.rotation = odometry.pose.pose.orientation
         self.tf_broadcaster.sendTransform(transform)
+
+    def _scan_callback(self, message, model):
+        carrier = self._carrier_for_model(model)
+        carrier.scan = message
+        if carrier is not self.active_carrier:
+            return
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = 'base_scan'
+        self.scan_publisher.publish(message)
+
+    def _publish_lidar_transform(self):
+        transform = TransformStamped()
+        transform.header.stamp = self.get_clock().now().to_msg()
+        transform.header.frame_id = 'base_link'
+        transform.child_frame_id = 'base_scan'
+        transform.transform.translation.z = 0.9
+        transform.transform.rotation.w = 1.0
+        self.static_tf_broadcaster.sendTransform(transform)
+
+    def _request_localization(self):
+        carrier = self.active_carrier
+        if carrier.ground_truth is None:
+            return
+        x, y, yaw = carrier.truth_pose()
+        initial_pose = PoseWithCovarianceStamped()
+        initial_pose.header.stamp = Time().to_msg()
+        initial_pose.header.frame_id = 'map'
+        initial_pose.pose.pose.position.x = x
+        initial_pose.pose.pose.position.y = y
+        initial_pose.pose.pose.orientation.z = sin(yaw / 2.0)
+        initial_pose.pose.pose.orientation.w = cos(yaw / 2.0)
+        initial_pose.pose.covariance[0] = 0.04
+        initial_pose.pose.covariance[7] = 0.04
+        initial_pose.pose.covariance[35] = 0.03
+        carrier.localized_pose = None
+        self.localization_pending = True
+        self.localization_candidate = None
+        self.localization_candidate_since = 0.0
+        now = time.monotonic()
+        if self.localization_requested_at == 0.0:
+            self.localization_requested_at = now
+        self.localization_last_publish_at = now
+        self.initial_pose_publisher.publish(initial_pose)
+        self.get_logger().info(
+            f'AMCL initial pose requested for box {carrier.item_class}'
+        )
+
+    def _amcl_pose_callback(self, message):
+        carrier = self.active_carrier
+        if carrier.ground_truth is None:
+            return
+        pose = message.pose.pose
+        yaw = atan2(
+            2.0 * (
+                pose.orientation.w * pose.orientation.z
+                + pose.orientation.x * pose.orientation.y
+            ),
+            1.0 - 2.0 * (
+                pose.orientation.y * pose.orientation.y
+                + pose.orientation.z * pose.orientation.z
+            ),
+        )
+        localized_pose = (
+            pose.position.x,
+            pose.position.y,
+            normalize_angle(yaw),
+        )
+        if self.localization_pending:
+            truth_x, truth_y, _ = carrier.truth_pose()
+            position_error = hypot(
+                localized_pose[0] - truth_x,
+                localized_pose[1] - truth_y,
+            )
+            if position_error > 1.0:
+                self.localization_candidate = None
+                self.localization_candidate_since = 0.0
+                return
+            now = time.monotonic()
+            if self.localization_candidate is None:
+                self.localization_candidate_since = now
+            elif hypot(
+                localized_pose[0] - self.localization_candidate[0],
+                localized_pose[1] - self.localization_candidate[1],
+            ) > 0.3:
+                self.localization_candidate_since = now
+            self.localization_candidate = localized_pose
+            return
+
+        truth_x, truth_y, _ = carrier.truth_pose()
+        if hypot(
+            localized_pose[0] - truth_x,
+            localized_pose[1] - truth_y,
+        ) > 1.5:
+            self.get_logger().warning(
+                f'AMCL pose rejected for box {carrier.item_class}: '
+                'outside simulation safety bound',
+                throttle_duration_sec=2.0,
+            )
+            return
+        carrier.localized_pose = localized_pose
+
+    def _complete_localization(self):
+        carrier = self.active_carrier
+        carrier.localized_pose = self.localization_candidate
+        self.localization_pending = False
+        self.localization_requested_at = 0.0
+        self.localization_candidate = None
+        self.localization_candidate_since = 0.0
+        self.get_logger().info(
+            f'AMCL localized box {carrier.item_class}'
+        )
+        if self.mode == 'LOCALIZING':
+            self.mode = 'SWITCHING'
+            self.next_goal_at = time.monotonic() + 0.8
 
     def _nav_command_callback(self, message):
         if self.mode != 'NAVIGATING':
@@ -221,7 +388,48 @@ class AmrController(Node):
 
     def _update(self):
         now = time.monotonic()
-        if self.mode in ('SWITCHING', 'RETRY_WAIT') and now >= self.next_goal_at:
+        carrier = self.active_carrier
+        sensors_ready = (
+            carrier.ground_truth is not None
+            and carrier.wheel_odometry is not None
+            and carrier.scan is not None
+        )
+        if (
+            self.mode == 'WAITING'
+            and sensors_ready
+            and carrier.localized_pose is None
+            and not self.localization_pending
+        ):
+            self._request_localization()
+        elif (
+            self.localization_pending
+            and self.localization_candidate is not None
+            and now - self.localization_candidate_since > 1.0
+        ):
+            self._complete_localization()
+        elif (
+            self.localization_pending
+            and now - self.localization_last_publish_at > 2.0
+        ):
+            self._request_localization()
+
+        if (
+            self.mode == 'LOCALIZING'
+            and self.localization_requested_at == 0.0
+            and sensors_ready
+            and now >= self.next_goal_at
+        ):
+            self._request_localization()
+        elif (
+            self.mode == 'LOCALIZING'
+            and self.localization_requested_at > 0.0
+            and now - self.localization_requested_at > 15.0
+        ):
+            self._terminal_failure('LOCALIZATION_TIMEOUT')
+        elif (
+            self.mode in ('SWITCHING', 'RETRY_WAIT')
+            and now >= self.next_goal_at
+        ):
             self._send_goal()
         elif (
             self.mode == 'GOAL_PENDING'
@@ -232,6 +440,11 @@ class AmrController(Node):
             self._monitor_navigation(now)
 
     def _send_goal(self):
+        if self.active_carrier.localized_pose is None:
+            self.mode = 'LOCALIZING'
+            self.localization_requested_at = 0.0
+            self._request_localization()
+            return
         if not self.navigator.server_is_ready():
             self._attempt_failed('NAV2_SERVER_UNAVAILABLE')
             return
@@ -424,8 +637,13 @@ class AmrController(Node):
         self.active_index += 1
         self.failed_attempts = 0
         self.goal_handle = None
-        self.mode = 'SWITCHING'
-        self.next_goal_at = time.monotonic() + 0.8
+        self.mode = 'LOCALIZING'
+        self.localization_requested_at = 0.0
+        self.localization_pending = False
+        self.localization_candidate = None
+        self.localization_candidate_since = 0.0
+        self.active_carrier.localized_pose = None
+        self.next_goal_at = time.monotonic() + 1.0
 
     def _stop_active(self):
         self.command_publishers[
