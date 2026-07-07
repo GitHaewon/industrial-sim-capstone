@@ -60,6 +60,9 @@ class DynamicObstacleDemo(Node):
         self.client = self.create_client(
             SetEntityPose, '/world/factory_test/set_pose'
         )
+        self.event_publisher = self.create_publisher(
+            String, '/factory/event', 10
+        )
         self.create_subscription(
             String, '/amr/state', self._state_callback, 10
         )
@@ -83,6 +86,9 @@ class DynamicObstacleDemo(Node):
             self.get_logger().info(
                 'Dynamic obstacle activated for Nav2 avoidance demo'
             )
+            self.event_publisher.publish(String(
+                data='warning:동적 장애물 회피 데모 활성화'
+            ))
         elif not should_move and self.active:
             self._park_obstacle()
         self.active = should_move
@@ -111,6 +117,9 @@ class DynamicObstacleDemo(Node):
             self.get_logger().info(
                 'Dynamic obstacle moved to safe parking position'
             )
+            self.event_publisher.publish(String(
+                data='info:동적 장애물 안전 위치 복귀'
+            ))
             return
 
         phase = (elapsed % self.period) / self.period

@@ -758,6 +758,116 @@
       </link>
     </model>
 
+    <!-- Shop-floor Andon tower: red/yellow/green lamps are mirrored by the
+         browser dashboard state so operators can read the cell at a glance. -->
+    <model name="andon_tower">
+      <static>true</static>
+      <pose>-4.75 -2.65 0 0 0 0</pose>
+      <link name="tower">
+        <visual name="andon_base">
+          <pose>0 0 0.05 0 0 0</pose>
+          <geometry><cylinder><radius>0.28</radius><length>0.1</length></cylinder></geometry>
+          <material><diffuse>0.06 0.07 0.08 1</diffuse></material>
+        </visual>
+        <visual name="andon_pole">
+          <pose>0 0 0.85 0 0 0</pose>
+          <geometry><cylinder><radius>0.045</radius><length>1.55</length></cylinder></geometry>
+          <material><diffuse>0.18 0.19 0.2 1</diffuse></material>
+        </visual>
+        <visual name="andon_housing">
+          <pose>0 0 1.7 0 0 0</pose>
+          <geometry><cylinder><radius>0.18</radius><length>0.74</length></cylinder></geometry>
+          <material><diffuse>0.04 0.045 0.05 1</diffuse></material>
+        </visual>
+        <visual name="andon_green_lamp">
+          <pose>0 0 1.47 0 0 0</pose>
+          <geometry><sphere><radius>0.19</radius></sphere></geometry>
+          <material>
+            <ambient>0.02 0.8 0.22 1</ambient>
+            <diffuse>0.04 1 0.28 1</diffuse>
+            <emissive>0.02 0.45 0.12 1</emissive>
+          </material>
+        </visual>
+        <visual name="andon_yellow_lamp">
+          <pose>0 0 1.72 0 0 0</pose>
+          <geometry><sphere><radius>0.19</radius></sphere></geometry>
+          <material>
+            <ambient>0.95 0.72 0.05 1</ambient>
+            <diffuse>1 0.8 0.08 1</diffuse>
+            <emissive>0.45 0.28 0.02 1</emissive>
+          </material>
+        </visual>
+        <visual name="andon_red_lamp">
+          <pose>0 0 1.97 0 0 0</pose>
+          <geometry><sphere><radius>0.19</radius></sphere></geometry>
+          <material>
+            <ambient>0.9 0.04 0.04 1</ambient>
+            <diffuse>1 0.06 0.06 1</diffuse>
+            <emissive>0.45 0.02 0.02 1</emissive>
+          </material>
+        </visual>
+        <visual name="andon_label_panel">
+          <pose>0.02 -0.32 0.96 1.5708 0 0</pose>
+          <geometry><box><size>0.82 0.03 0.28</size></box></geometry>
+          <material><diffuse>0.02 0.12 0.22 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Dock labels, arrival check marks, and lamp/open-door accents for the
+         three right-side loading bays. The labels are built with simple box
+         strokes to avoid external fonts or model downloads. -->
+    <model name="dock_signage">
+      <static>true</static>
+      <link name="signage">
+        <visual name="dock_label_a_plate"><pose>-5.2 -7.88 0.055 0 0 0</pose><geometry><box><size>1.45 0.7 0.04</size></box></geometry><material><diffuse>0.7 0.03 0.04 1</diffuse></material></visual>
+        <visual name="dock_label_b_plate"><pose>0 -7.88 0.055 0 0 0</pose><geometry><box><size>1.45 0.7 0.04</size></box></geometry><material><diffuse>0.03 0.5 0.1 1</diffuse></material></visual>
+        <visual name="dock_label_c_plate"><pose>5.2 -7.88 0.055 0 0 0</pose><geometry><box><size>1.45 0.7 0.04</size></box></geometry><material><diffuse>0.02 0.18 0.78 1</diffuse></material></visual>
+
+        <!-- A -->
+        <visual name="dock_label_a_left_stroke"><pose>-5.38 -7.88 0.09 0 0 -0.22</pose><geometry><box><size>0.09 0.55 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_a_right_stroke"><pose>-5.02 -7.88 0.09 0 0 0.22</pose><geometry><box><size>0.09 0.55 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_a_bar"><pose>-5.2 -7.88 0.095 0 0 0</pose><geometry><box><size>0.42 0.08 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <!-- B -->
+        <visual name="dock_label_b_spine"><pose>-0.26 -7.88 0.09 0 0 0</pose><geometry><box><size>0.08 0.56 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_b_top"><pose>0 -7.61 0.09 0 0 0</pose><geometry><box><size>0.52 0.08 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_b_mid"><pose>0 -7.88 0.09 0 0 0</pose><geometry><box><size>0.48 0.08 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_b_bottom"><pose>0 -8.15 0.09 0 0 0</pose><geometry><box><size>0.52 0.08 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_b_right"><pose>0.28 -7.88 0.09 0 0 0</pose><geometry><box><size>0.08 0.46 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <!-- C -->
+        <visual name="dock_label_c_top"><pose>5.2 -7.61 0.09 0 0 0</pose><geometry><box><size>0.58 0.08 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_c_left"><pose>4.91 -7.88 0.09 0 0 0</pose><geometry><box><size>0.08 0.54 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_label_c_bottom"><pose>5.2 -8.15 0.09 0 0 0</pose><geometry><box><size>0.58 0.08 0.035</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+
+        <!-- Door-open green threshold pads and bay lamps. -->
+        <visual name="dock_open_pad_a"><pose>-5.2 -8.08 0.03 0 0 0</pose><geometry><box><size>2.35 0.18 0.03</size></box></geometry><material><diffuse>0.05 0.95 0.28 1</diffuse></material></visual>
+        <visual name="dock_open_pad_b"><pose>0 -8.08 0.03 0 0 0</pose><geometry><box><size>2.35 0.18 0.03</size></box></geometry><material><diffuse>0.05 0.95 0.28 1</diffuse></material></visual>
+        <visual name="dock_open_pad_c"><pose>5.2 -8.08 0.03 0 0 0</pose><geometry><box><size>2.35 0.18 0.03</size></box></geometry><material><diffuse>0.05 0.95 0.28 1</diffuse></material></visual>
+        <visual name="dock_lamp_a"><pose>-3.48 -8.08 3.45 0 0 0</pose><geometry><sphere><radius>0.18</radius></sphere></geometry><material><diffuse>0.04 1 0.28 1</diffuse><emissive>0.02 0.55 0.13 1</emissive></material></visual>
+        <visual name="dock_lamp_b"><pose>1.72 -8.08 3.45 0 0 0</pose><geometry><sphere><radius>0.18</radius></sphere></geometry><material><diffuse>0.04 1 0.28 1</diffuse><emissive>0.02 0.55 0.13 1</emissive></material></visual>
+        <visual name="dock_lamp_c"><pose>6.92 -8.08 3.45 0 0 0</pose><geometry><sphere><radius>0.18</radius></sphere></geometry><material><diffuse>0.04 1 0.28 1</diffuse><emissive>0.02 0.55 0.13 1</emissive></material></visual>
+
+        <!-- Arrival check marks in front of each destination zone. -->
+        <visual name="dock_check_a_short"><pose>-5.37 -6.78 0.065 0 0 -0.55</pose><geometry><box><size>0.08 0.38 0.035</size></box></geometry><material><diffuse>0.04 1 0.28 1</diffuse></material></visual>
+        <visual name="dock_check_a_long"><pose>-5.08 -6.73 0.065 0 0 0.72</pose><geometry><box><size>0.08 0.72 0.035</size></box></geometry><material><diffuse>0.04 1 0.28 1</diffuse></material></visual>
+        <visual name="dock_check_b_short"><pose>-0.17 -6.78 0.065 0 0 -0.55</pose><geometry><box><size>0.08 0.38 0.035</size></box></geometry><material><diffuse>0.04 1 0.28 1</diffuse></material></visual>
+        <visual name="dock_check_b_long"><pose>0.12 -6.73 0.065 0 0 0.72</pose><geometry><box><size>0.08 0.72 0.035</size></box></geometry><material><diffuse>0.04 1 0.28 1</diffuse></material></visual>
+        <visual name="dock_check_c_short"><pose>5.03 -6.78 0.065 0 0 -0.55</pose><geometry><box><size>0.08 0.38 0.035</size></box></geometry><material><diffuse>0.04 1 0.28 1</diffuse></material></visual>
+        <visual name="dock_check_c_long"><pose>5.32 -6.73 0.065 0 0 0.72</pose><geometry><box><size>0.08 0.72 0.035</size></box></geometry><material><diffuse>0.04 1 0.28 1</diffuse></material></visual>
+
+        <!-- Direction arrows guiding BOX A/B/C into their respective doors. -->
+        <visual name="dock_arrow_a_lane"><pose>-5.2 -5.95 0.035 0 0 0</pose><geometry><box><size>0.12 1.35 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_a_head_l"><pose>-5.34 -6.56 0.04 0 0 -0.72</pose><geometry><box><size>0.1 0.42 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_a_head_r"><pose>-5.06 -6.56 0.04 0 0 0.72</pose><geometry><box><size>0.1 0.42 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_b_lane"><pose>0 -5.95 0.035 0 0 0</pose><geometry><box><size>0.12 1.35 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_b_head_l"><pose>-0.14 -6.56 0.04 0 0 -0.72</pose><geometry><box><size>0.1 0.42 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_b_head_r"><pose>0.14 -6.56 0.04 0 0 0.72</pose><geometry><box><size>0.1 0.42 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_c_lane"><pose>5.2 -5.95 0.035 0 0 0</pose><geometry><box><size>0.12 1.35 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_c_head_l"><pose>5.06 -6.56 0.04 0 0 -0.72</pose><geometry><box><size>0.1 0.42 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+        <visual name="dock_arrow_c_head_r"><pose>5.34 -6.56 0.04 0 0 0.72</pose><geometry><box><size>0.1 0.42 0.03</size></box></geometry><material><diffuse>1 1 1 1</diffuse></material></visual>
+      </link>
+    </model>
+
     <!-- Kinematic obstacle used by the RViz/Nav2 avoidance demo. The
          dynamic_obstacle_demo node briefly moves this pallet near the B box
          route through /world/factory_test/set_pose so LiDAR and costmaps can

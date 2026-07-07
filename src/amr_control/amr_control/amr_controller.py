@@ -29,6 +29,11 @@ def normalize_angle(angle):
     return (angle + pi) % (2.0 * pi) - pi
 
 
+def clamp(value, minimum, maximum):
+    """Limit a value to the inclusive range [minimum, maximum]."""
+    return max(minimum, min(maximum, value))
+
+
 @dataclass
 class BoxCarrier:
     """Configuration and latest pose for a mobile sorting box."""
@@ -39,12 +44,14 @@ class BoxCarrier:
     initial_y: float
     initial_yaw: float
     goals: tuple
+    escape_pose: tuple | None = None
     ground_truth: Odometry | None = None
     wheel_odometry: Odometry | None = None
     scan: LaserScan | None = None
     localized_pose: tuple | None = None
     goal_index: int = 0
     arrived: bool = False
+    escaped: bool = False
 
     def world_pose(self):
         """Return the AMCL pose, falling back to truth before localization."""
@@ -74,22 +81,22 @@ class AmrController(Node):
     CARRIERS = (
         (
             'bin_a_red', 'A', 0.5, -2.95, pi,
-            ((-5.2, -7.0, -pi / 2.0),),
+            ((-5.2, -6.35, -pi / 2.0),),
         ),
         (
             'bin_b_green', 'B', 2.75, -1.5, 0.0,
             (
-                (4.5, -1.5, 0.0),
-                (4.5, -5.8, -pi / 2.0),
-                (0.0, -7.0, -pi / 2.0),
+                (4.4, -5.8, -pi / 2.0),
+                (0.0, -6.35, -pi / 2.0),
             ),
+            (4.4, -3.5, -pi / 2.0),
         ),
         (
             'bin_c_blue', 'C', 2.0, -2.8, -pi / 2.0,
             (
                 (2.0, -4.8, -pi / 2.0),
-                (5.2, -6.4, -0.5),
-                (5.2, -7.0, -pi / 2.0),
+                (5.2, -5.8, -0.5),
+                (5.2, -6.35, -pi / 2.0),
             ),
         ),
     )
@@ -100,7 +107,7 @@ class AmrController(Node):
         self.declare_parameter('navigation_timeout', 120.0)
         self.declare_parameter('stuck_timeout', 18.0)
         self.declare_parameter('retry_delay', 2.0)
-        self.declare_parameter('arrival_tolerance', 0.55)
+        self.declare_parameter('arrival_tolerance', 0.8)
         self.max_retries = int(self.get_parameter('max_retries').value)
         self.navigation_timeout = float(
             self.get_parameter('navigation_timeout').value
@@ -129,6 +136,7 @@ class AmrController(Node):
         self.localization_last_publish_at = 0.0
         self.localization_candidate = None
         self.localization_candidate_since = 0.0
+        self.escape_started_at = 0.0
 
         self.command_publishers = {}
         for carrier in self.carriers:
@@ -219,6 +227,7 @@ class AmrController(Node):
         for carrier in self.carriers:
             carrier.goal_index = 0
             carrier.arrived = False
+            carrier.escaped = False
         if self.active_carrier.localized_pose is None:
             self.mode = 'LOCALIZING'
             self._request_localization()
@@ -430,14 +439,110 @@ class AmrController(Node):
             self.mode in ('SWITCHING', 'RETRY_WAIT')
             and now >= self.next_goal_at
         ):
-            self._send_goal()
+            if (
+                self.mode == 'SWITCHING'
+                and carrier.escape_pose is not None
+                and not carrier.escaped
+            ):
+                self._begin_escape()
+            else:
+                self._send_goal()
         elif (
             self.mode == 'GOAL_PENDING'
             and now - self.goal_sent_at > 10.0
         ):
             self._attempt_failed('GOAL_RESPONSE_TIMEOUT')
+        elif self.mode == 'ESCAPING':
+            self._drive_escape(now)
         elif self.mode == 'NAVIGATING':
             self._monitor_navigation(now)
+
+    def _begin_escape(self):
+        carrier = self.active_carrier
+        self.mode = 'ESCAPING'
+        self.escape_started_at = time.monotonic()
+        self.progress_pose = carrier.truth_pose()
+        self.last_progress_at = self.escape_started_at
+        self.state_publisher.publish(String(
+            data=f'STAGING_ESCAPE:{carrier.item_class}'
+        ))
+        self.get_logger().info(
+            f'Box {carrier.item_class} leaving tight loading bay before Nav2'
+        )
+
+    def _drive_escape(self, now):
+        carrier = self.active_carrier
+        if carrier.escape_pose is None:
+            carrier.escaped = True
+            self.mode = 'SWITCHING'
+            self.next_goal_at = now + 0.2
+            return
+
+        x, y, yaw = carrier.truth_pose()
+        goal_x, goal_y, goal_yaw = carrier.escape_pose
+        dx = goal_x - x
+        dy = goal_y - y
+        distance = hypot(dx, dy)
+        yaw_error = normalize_angle(goal_yaw - yaw)
+        command = Twist()
+
+        if distance <= 0.40 and abs(yaw_error) <= 0.50:
+            self._finish_escape()
+            return
+
+        if distance > 0.18:
+            target_yaw = atan2(dy, dx)
+            heading_error = normalize_angle(target_yaw - yaw)
+            if abs(heading_error) > 0.28:
+                command.angular.z = clamp(1.25 * heading_error, -0.45, 0.45)
+            else:
+                command.linear.x = clamp(0.65 * distance, 0.08, 0.28)
+                command.angular.z = clamp(1.1 * heading_error, -0.35, 0.35)
+        else:
+            if abs(yaw_error) > 0.16:
+                command.angular.z = clamp(1.0 * yaw_error, -0.35, 0.35)
+            else:
+                self._finish_escape()
+                return
+
+        self.command_publishers[carrier.model].publish(command)
+
+        moved = hypot(
+            x - self.progress_pose[0],
+            y - self.progress_pose[1],
+        ) if self.progress_pose is not None else 0.0
+        turned = abs(normalize_angle(
+            yaw - self.progress_pose[2]
+        )) if self.progress_pose is not None else 0.0
+        if moved > 0.04 or turned > 0.08:
+            self.progress_pose = (x, y, yaw)
+            self.last_progress_at = now
+
+        if now - self.escape_started_at > 60.0:
+            self._terminal_failure('STAGING_ESCAPE_TIMEOUT')
+        elif now - self.last_progress_at > self.stuck_timeout:
+            self._terminal_failure('STAGING_ESCAPE_STUCK')
+
+    def _finish_escape(self):
+        carrier = self.active_carrier
+        pose = carrier.truth_pose()
+        self._stop_active()
+        carrier.escaped = True
+        carrier.localized_pose = None
+        self.localization_requested_at = 0.0
+        self.localization_pending = False
+        self.localization_candidate = None
+        self.localization_candidate_since = 0.0
+        self.mode = 'LOCALIZING'
+        self.next_goal_at = time.monotonic() + 0.5
+        self.state_publisher.publish(String(
+            data=f'STAGED_FOR_NAV2:{carrier.item_class}'
+        ))
+        self.get_logger().info(
+            f'Box {carrier.item_class} staged safely at '
+            f'({pose[0]:.2f}, {pose[1]:.2f}, yaw={pose[2]:.2f}); '
+            'handing back to Nav2'
+        )
 
     def _send_goal(self):
         if self.active_carrier.localized_pose is None:
@@ -526,6 +631,23 @@ class AmrController(Node):
         if moved > 0.08 or turned > 0.10:
             self.progress_pose = current_pose
             self.last_progress_at = now
+
+        distance = self._goal_distance()
+        if (
+            self.active_carrier.goal_index
+            == len(self.active_carrier.goals) - 1
+            and distance <= self.arrival_tolerance
+        ):
+            self.get_logger().info(
+                f'Box {self.active_carrier.item_class} accepted at '
+                f'dock standoff (error {distance:.2f} m)'
+            )
+            self.goal_serial += 1
+            if self.goal_handle is not None:
+                self.goal_handle.cancel_goal_async()
+            self.goal_handle = None
+            self._carrier_arrived(distance)
+            return
 
         if now - self.goal_sent_at > self.navigation_timeout:
             self._attempt_failed('TIMEOUT')

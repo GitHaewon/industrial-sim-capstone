@@ -1,10 +1,12 @@
 """Feedback-driven pick-and-place coordinator for the Gazebo sorting arm."""
 
+import json
 import math
 import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool
 from std_msgs.msg import Empty
@@ -39,6 +41,14 @@ class ArmController(Node):
         self.spawner_ready = False
         self.latest_detections = []
         self.last_detection_time = 0.0
+        self.arrival_order = []
+        self.waiting_for_manifest_logged = False
+
+        latched_qos = QoSProfile(
+            depth=1,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
 
         self.yaw_publisher = self.create_publisher(
             Float64, '/arm/yaw_cmd', 10
@@ -75,7 +85,12 @@ class ArmController(Node):
             String, '/conveyor/state', self._conveyor_state_callback, 10
         )
         self.create_subscription(
-            Bool, '/item_spawner/ready', self._spawner_ready_callback, 10
+            Bool, '/item_spawner/ready', self._spawner_ready_callback,
+            latched_qos
+        )
+        self.create_subscription(
+            String, '/item_spawner/manifest', self._manifest_callback,
+            latched_qos
         )
         self.create_subscription(
             Detection3DArray,
@@ -102,6 +117,19 @@ class ArmController(Node):
                 self._transition('INITIALIZING')
             self.get_logger().info('New random item batch is ready')
 
+    def _manifest_callback(self, message):
+        try:
+            manifest = json.loads(message.data)
+        except json.JSONDecodeError:
+            self.get_logger().warning('Invalid item manifest JSON')
+            return
+        self.arrival_order = list(manifest.get('arrival_order', []))
+        self.waiting_for_manifest_logged = False
+        self.get_logger().info(
+            'Received item manifest: '
+            + ' -> '.join(self.arrival_order)
+        )
+
     def _conveyor_state_callback(self, message):
         if self.state != 'WAITING' or message.data != 'STOPPED:ITEM_READY':
             return
@@ -116,13 +144,29 @@ class ArmController(Node):
         if time.monotonic() - self.last_detection_time > 1.0:
             return False
 
-        candidates = [
-            detection for detection in self.latest_detections
-            if detection.results
-            and detection.results[0].hypothesis.class_id
-            in self.CLASS_TO_ITEM
-            and detection.results[0].hypothesis.score >= 0.45
-        ]
+        expected_class = ''
+        if 0 <= self.processed_count < len(self.arrival_order):
+            expected_class = self.arrival_order[self.processed_count]
+        if not expected_class:
+            if not self.waiting_for_manifest_logged:
+                self.waiting_for_manifest_logged = True
+                self.get_logger().warning(
+                    'Waiting for item manifest before picking'
+                )
+            return False
+
+        candidates = []
+        for detection in self.latest_detections:
+            if not detection.results:
+                continue
+            hypothesis = detection.results[0].hypothesis
+            if (
+                hypothesis.class_id not in self.CLASS_TO_ITEM
+                or hypothesis.score < 0.45
+                or hypothesis.class_id != expected_class
+            ):
+                continue
+            candidates.append(detection)
         if not candidates:
             return
         detection = max(
@@ -135,6 +179,7 @@ class ArmController(Node):
         self.get_logger().info(
             'Vision selected '
             f'class={hypothesis.class_id} '
+            f'expected={expected_class} '
             f'confidence={hypothesis.score:.2f} '
             f'world=({position.x:.2f}, '
             f'{position.y:.2f}, '

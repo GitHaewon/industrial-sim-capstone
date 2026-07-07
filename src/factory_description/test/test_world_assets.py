@@ -42,6 +42,8 @@ def test_world_contains_sorting_cell_components():
         'warehouse_building',
         'warehouse_racking',
         'warehouse_floor_markings',
+        'andon_tower',
+        'dock_signage',
         'moving_pallet_obstacle',
     } <= model_names
 
@@ -120,6 +122,36 @@ def test_world_contains_sorting_cell_components():
     assert moving_obstacle.find(
         "./link/collision[@name='body_collision']"
     ) is not None
+
+    andon = world.find("./model[@name='andon_tower']/link")
+    andon_visual_names = {
+        visual.attrib['name'] for visual in andon.findall('visual')
+    }
+    assert {
+        'andon_red_lamp',
+        'andon_yellow_lamp',
+        'andon_green_lamp',
+        'andon_label_panel',
+    } <= andon_visual_names
+
+    signage = world.find("./model[@name='dock_signage']/link")
+    signage_visual_names = {
+        visual.attrib['name'] for visual in signage.findall('visual')
+    }
+    assert {
+        'dock_label_a_plate',
+        'dock_label_b_plate',
+        'dock_label_c_plate',
+        'dock_lamp_a',
+        'dock_lamp_b',
+        'dock_lamp_c',
+        'dock_check_a_long',
+        'dock_check_b_long',
+        'dock_check_c_long',
+        'dock_arrow_a_lane',
+        'dock_arrow_b_lane',
+        'dock_arrow_c_lane',
+    } <= signage_visual_names
 
 
 def test_launch_uses_ros_gz_sim():
