@@ -277,28 +277,6 @@ GZ_PARTITION=industrial_sim_capstone
 - **다중 로봇/다중 AMR 미지원**: 현재는 AMR 역할을 이동식 상자 3대가 순차적으로 수행하며, 동시에 여러 대가 병렬로 주행하는 구조는 아닙니다(`docs/requirements.md`의 범위 제외 항목 참고).
 - **실시간 경로 최적화 및 생산 스케줄링 미구현**: 현재는 고정된 순서(A → B → C)로 상자가 이동하며, 복잡한 생산 스케줄링이나 동적 우선순위 조정은 범위에 포함되지 않았습니다.
 
-## 12. 팀원 및 역할
-
-저장소의 `docs/team-tasks.md`에는 역할 구분(팀장/통합, 월드 담당, 컨베이어 담당, 로봇팔 담당, AMR 담당)이 문서화되어 있으나, 각 역할과 실제 팀원 이름을 연결하는 정보는 저장소 내에서 확인되지 않았습니다. GitHub 저장소에는 다음 협업자가 등록되어 있습니다(이름-역할 매핑은 추가 작성 필요).
-
-| GitHub 계정 | 역할 |
-| --- | --- |
-| GitHaewon | 추가 작성 필요 |
-| hwi-ya | 추가 작성 필요 |
-| himmelmin | 추가 작성 필요 |
-| kdh8278 | 추가 작성 필요 |
-| yongjun1290 | 추가 작성 필요 |
-
-`docs/team-tasks.md` 기준 역할 구조는 다음과 같습니다.
-
-| 역할 | 주요 작업 | 담당 패키지 |
-| --- | --- | --- |
-| 팀장·통합 | 상태 머신, 통합 launch, 인터페이스 관리 | `factory_manager` |
-| 월드 담당 | 공장 월드와 모델 배치 | `factory_description` |
-| 컨베이어 담당 | 물품 생성, 이동 및 정지 | `conveyor_control` |
-| 로봇팔 담당 | Pick & Place 구현 | `arm_control` |
-| AMR 담당 | 출발지에서 창고까지 이동 | `amr_control` |
-
 ## 콘셉트 영상
 
 [스마트팩토리 구현 스토리 예시 영상 보기](media/industrial_sim_story_example.mp4)
@@ -321,10 +299,6 @@ feature/arm
 feature/amr
 feature/factory-manager
 ```
-
-## 참고 자료
-
-창고 레이아웃은 Apache-2.0으로 공개된 [Gazebo Jetty 데모](https://github.com/gazebosim/jetty_demo)의 구성을 참고해 ROS 2 Jazzy와 Gazebo Harmonic에서 가볍게 실행되는 기본 도형 기반 월드로 재구성했습니다.
 
 ## 문서
 
