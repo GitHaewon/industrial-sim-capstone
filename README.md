@@ -113,6 +113,8 @@ industrial-sim-capstone/
 - Nav2 전역 계획·경로 추종 기반 A/B/C 이동식 상자의 출하 문 운송
 - 각 이동 상자의 360도 LiDAR와 휠 오도메트리, AMCL 기반 위치 추정
 - `/scan` 장애물 레이어와 충돌 예측을 이용한 정적·동적 장애물 대응
+- RViz2에서 지도, TF, AMCL, LiDAR, global/local costmap과 Nav2 경로 시각화
+- 이동 팔레트 장애물을 이용한 동적 장애물 회피·재계획 검증 데모
 - 시간 초과·무진행·목표 오차 감지와 최대 2회 자동 재시도
 - 대형 창고 외벽, 고천장 조명, 팔레트 랙, 적재 도크와 통로 마킹
 - ROS 2 상태를 실시간 표시하는 브라우저 공정 관제 대시보드
@@ -138,6 +140,24 @@ source /opt/ros/jazzy/setup.bash
 ./scripts/setup-dev.sh
 source install/setup.bash
 ros2 launch factory_description factory_test.launch.py
+```
+
+기본 실행은 Gazebo와 함께 RViz2도 열고, B 박스의 첫 주행 구간 근처에서
+짧게 움직이는 동적 팔레트 장애물 데모를 켭니다. RViz2에서는 `/scan`, `/amcl_pose`,
+`/global_costmap/costmap`, `/local_costmap/costmap`, `/plan`을 확인하면
+장애물 감지와 우회 경로를 눈으로 볼 수 있습니다.
+통합 launch는 `GZ_IP=127.0.0.1`, `IGN_IP=127.0.0.1`,
+`GZ_PARTITION=industrial_sim_capstone`을 자동 설정해 단일 PC 실행에서
+Gazebo transport 멀티캐스트 경고를 줄입니다.
+
+```bash
+ros2 launch factory_description factory_test.launch.py rviz:=true dynamic_obstacle:=true
+```
+
+노트북 성능이 부족하거나 Gazebo만 보고 싶으면 각각 끌 수 있습니다.
+
+```bash
+ros2 launch factory_description factory_test.launch.py rviz:=false dynamic_obstacle:=false
 ```
 
 다른 랜덤 배치를 재현하려면 시드를 지정합니다. 같은 시드는 같은 도착 순서와

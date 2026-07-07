@@ -42,6 +42,7 @@ def test_world_contains_sorting_cell_components():
         'warehouse_building',
         'warehouse_racking',
         'warehouse_floor_markings',
+        'moving_pallet_obstacle',
     } <= model_names
 
     rgbd_sensor = world.find(
@@ -113,6 +114,13 @@ def test_world_contains_sorting_cell_components():
     assert len(rack_visual_names) >= 40
     assert {'cargo_n_1', 'cargo_s_5'} <= rack_visual_names
 
+    moving_obstacle = world.find("./model[@name='moving_pallet_obstacle']")
+    assert moving_obstacle is not None
+    assert moving_obstacle.findtext('static') == 'true'
+    assert moving_obstacle.find(
+        "./link/collision[@name='body_collision']"
+    ) is not None
+
 
 def test_launch_uses_ros_gz_sim():
     launch_text = (
@@ -137,6 +145,14 @@ def test_launch_uses_ros_gz_sim():
     assert '/model/bin_b_green/scan' in launch_text
     assert '/model/bin_c_blue/scan' in launch_text
     assert '/model/bin_a_red/wheel_odometry' in launch_text
+    assert "executable='dynamic_obstacle_demo'" in launch_text
+    assert "executable='rviz2'" in launch_text
+    assert "factory_nav.rviz" in launch_text
+    assert "dynamic_obstacle" in launch_text
+    assert "SetEnvironmentVariable('GZ_IP', '127.0.0.1')" in launch_text
+    assert "SetEnvironmentVariable('IGN_IP', '127.0.0.1')" in launch_text
+    assert "SetEnvironmentVariable(" in launch_text
+    assert 'industrial_sim_capstone' in launch_text
 
 
 def test_sorting_bins_do_not_overlap():

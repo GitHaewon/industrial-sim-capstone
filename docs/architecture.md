@@ -28,10 +28,14 @@ IDLE
 | `/box/ready` | `std_msgs/msg/Bool` | 박스 적재 완료 |
 | `/amr/start_delivery` | `std_msgs/msg/Bool` | A/B/C 적재 상자 운송 시작 |
 | `/amr/delivery_complete` | `std_msgs/msg/Bool` | 세 상자의 구역 배송 완료 |
+| `/amr/state` | `std_msgs/msg/String` | AMR 운송·재시도·도착 상태 |
 | `/scan` | `sensor_msgs/msg/LaserScan` | 현재 운송 상자의 360도 LiDAR |
 | `/nav/odom` | `nav_msgs/msg/Odometry` | 현재 운송 상자의 휠 오도메트리 |
 | `/amcl_pose` | `geometry_msgs/msg/PoseWithCovarianceStamped` | 지도 기준 AMCL 추정 위치 |
 | `/initialpose` | `geometry_msgs/msg/PoseWithCovarianceStamped` | 상자 전환 시 AMCL 초기 위치 |
+| `/global_costmap/costmap` | `nav_msgs/msg/OccupancyGrid` | Nav2 전역 costmap |
+| `/local_costmap/costmap` | `nav_msgs/msg/OccupancyGrid` | Nav2 지역 costmap |
+| `/plan` | `nav_msgs/msg/Path` | 현재 Nav2 전역 계획 경로 |
 | `/factory/state` | `std_msgs/msg/String` | 전체 공정 상태 |
 
 인터페이스를 변경할 경우 관련 담당자와 합의한 후 이 문서를 먼저 수정한다.
@@ -44,3 +48,10 @@ IDLE
 ```text
 factory_description/launch/factory_test.launch.py
 ```
+
+기본 실행은 RViz2 시각화와 동적 팔레트 장애물 데모를 함께 켠다.
+`rviz:=false` 또는 `dynamic_obstacle:=false` launch 인자로 각각 비활성화할
+수 있다. 동적 장애물 노드는 `/amr/state`가 `NAVIGATING:B`일 때
+`/world/factory_test/set_pose` 서비스를 사용해 `moving_pallet_obstacle`
+모델을 B 박스의 첫 Nav2 주행 구간 근처에서 짧게 이동시킨 뒤 안전 위치로
+복귀시킨다.

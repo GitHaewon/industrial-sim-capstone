@@ -758,6 +758,49 @@
       </link>
     </model>
 
+    <!-- Kinematic obstacle used by the RViz/Nav2 avoidance demo. The
+         dynamic_obstacle_demo node briefly moves this pallet near the B box
+         route through /world/factory_test/set_pose so LiDAR and costmaps can
+         show live obstacle marking, clearing, and replanning. -->
+    <model name="moving_pallet_obstacle">
+      <static>true</static>
+      <pose>8.2 -5.95 0 0 0 0</pose>
+      <link name="pallet">
+        <collision name="body_collision">
+          <pose>0 0 0.45 0 0 0</pose>
+          <geometry><box><size>1.05 0.85 0.9</size></box></geometry>
+        </collision>
+        <visual name="body">
+          <pose>0 0 0.45 0 0 0</pose>
+          <geometry><box><size>1.05 0.85 0.9</size></box></geometry>
+          <material>
+            <ambient>0.02 0.02 0.02 1</ambient>
+            <diffuse>0.02 0.02 0.02 1</diffuse>
+          </material>
+        </visual>
+        <visual name="warning_stripe_front">
+          <pose>0 -0.431 0.68 0 0 0</pose>
+          <geometry><box><size>0.92 0.02 0.12</size></box></geometry>
+          <material><diffuse>1 0.75 0.02 1</diffuse></material>
+        </visual>
+        <visual name="warning_stripe_rear">
+          <pose>0 0.431 0.68 0 0 0</pose>
+          <geometry><box><size>0.92 0.02 0.12</size></box></geometry>
+          <material><diffuse>1 0.75 0.02 1</diffuse></material>
+        </visual>
+        <visual name="fork_pocket_left">
+          <pose>0 -0.2 0.12 0 0 0</pose>
+          <geometry><box><size>1.15 0.12 0.12</size></box></geometry>
+          <material><diffuse>0.58 0.33 0.11 1</diffuse></material>
+        </visual>
+        <visual name="fork_pocket_right">
+          <pose>0 0.2 0.12 0 0 0</pose>
+          <geometry><box><size>1.15 0.12 0.12</size></box></geometry>
+          <material><diffuse>0.58 0.33 0.11 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
     <!-- Floor safety markings make the work-cell boundary visible. -->
     <model name="safety_zone">
       <static>true</static>

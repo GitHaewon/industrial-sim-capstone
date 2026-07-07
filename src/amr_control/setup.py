@@ -28,6 +28,10 @@ setup(
     entry_points={
         'console_scripts': [
             'amr_controller = amr_control.amr_controller:main',
+            (
+                'dynamic_obstacle_demo = '
+                'amr_control.dynamic_obstacle_demo:main'
+            ),
         ],
     },
 )

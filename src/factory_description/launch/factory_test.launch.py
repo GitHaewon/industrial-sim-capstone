@@ -2,7 +2,12 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
+)
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -12,12 +17,20 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     random_seed = LaunchConfiguration('random_seed')
+    use_rviz = LaunchConfiguration('rviz')
+    dynamic_obstacle = LaunchConfiguration('dynamic_obstacle')
     amr_share = Path(get_package_share_directory('amr_control'))
     nav2_params = amr_share / 'config' / 'nav2_params.yaml'
     map_yaml = amr_share / 'config' / 'factory_map.yaml'
+    rviz_config = amr_share / 'config' / 'factory_nav.rviz'
     world_path = Path(
         get_package_share_directory('factory_description')
     ) / 'worlds' / 'factory_test.sdf'
+    local_gz_ip = SetEnvironmentVariable('GZ_IP', '127.0.0.1')
+    local_ign_ip = SetEnvironmentVariable('IGN_IP', '127.0.0.1')
+    gz_partition = SetEnvironmentVariable(
+        'GZ_PARTITION', 'industrial_sim_capstone'
+    )
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -167,6 +180,26 @@ def generate_launch_description():
         output='screen',
     )
 
+    dynamic_obstacle_demo = Node(
+        package='amr_control',
+        executable='dynamic_obstacle_demo',
+        parameters=[{
+            'enabled': ParameterValue(dynamic_obstacle, value_type=bool),
+            'model_name': 'moving_pallet_obstacle',
+            'crossing_y': -1.1,
+            'left_x': 3.4,
+            'right_x': 3.8,
+            'park_x': 8.2,
+            'park_y': -5.95,
+            'period': 4.0,
+            'active_duration': 3.0,
+            'max_activations': 1,
+            'activation_state_prefix': 'NAVIGATING:B',
+        }],
+        condition=IfCondition(dynamic_obstacle),
+        output='screen',
+    )
+
     map_server = Node(
         package='nav2_map_server',
         executable='map_server',
@@ -244,12 +277,34 @@ def generate_launch_description():
         output='screen',
     )
 
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='factory_rviz',
+        arguments=['-d', str(rviz_config)],
+        condition=IfCondition(use_rviz),
+        output='screen',
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument(
             'random_seed',
             default_value='42',
             description='Seed for item order and conveyor spacing',
         ),
+        DeclareLaunchArgument(
+            'rviz',
+            default_value='true',
+            description='Open RViz2 with Nav2, AMCL, LiDAR, and costmaps',
+        ),
+        DeclareLaunchArgument(
+            'dynamic_obstacle',
+            default_value='true',
+            description='Move a pallet obstacle across the delivery aisle',
+        ),
+        local_gz_ip,
+        local_ign_ip,
+        gz_partition,
         gazebo,
         conveyor_bridge,
         conveyor_controller,
@@ -264,6 +319,8 @@ def generate_launch_description():
         bt_navigator,
         nav2_lifecycle,
         amr_controller,
+        dynamic_obstacle_demo,
         factory_manager,
         dashboard,
+        rviz,
     ])
