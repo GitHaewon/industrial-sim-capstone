@@ -155,6 +155,30 @@ def test_launch_uses_ros_gz_sim():
     assert 'industrial_sim_capstone' in launch_text
 
 
+def test_demo_launch_wraps_factory_test_with_presentation_defaults():
+    demo_launch = PACKAGE_ROOT / 'launch' / 'demo.launch.py'
+    launch_text = demo_launch.read_text(encoding='utf-8')
+
+    assert 'factory_test.launch.py' in launch_text
+    assert "default_value='42'" in launch_text
+    assert "default_value='true'" in launch_text
+    assert "'random_seed': random_seed" in launch_text
+    assert "'rviz': use_rviz" in launch_text
+    assert "'dynamic_obstacle': dynamic_obstacle" in launch_text
+
+
+def test_run_demo_script_uses_demo_launch():
+    script = PACKAGE_ROOT.parents[1] / 'scripts' / 'run-demo.sh'
+    script_text = script.read_text(encoding='utf-8')
+
+    assert script.exists()
+    assert 'set -eo pipefail' in script_text
+    assert 'source /opt/ros/jazzy/setup.bash' in script_text
+    assert 'colcon build --symlink-install' in script_text
+    assert 'source install/setup.bash' in script_text
+    assert 'ros2 launch factory_description demo.launch.py' in script_text
+
+
 def test_sorting_bins_do_not_overlap():
     world = ET.parse(
         PACKAGE_ROOT / 'worlds' / 'factory_test.sdf'

@@ -142,6 +142,38 @@ source install/setup.bash
 ros2 launch factory_description factory_test.launch.py
 ```
 
+## 시연용 원버튼 실행
+
+발표나 녹화용으로는 다음 스크립트를 권장합니다. 필요한 패키지를 먼저 빌드한
+뒤, Gazebo·RViz2·관제 대시보드·동적 장애물 데모를 결정적 시드로 함께
+실행합니다.
+
+```bash
+./scripts/run-demo.sh
+```
+
+이미 빌드가 끝난 상태에서 빠르게 다시 실행하려면 빌드를 건너뜁니다.
+
+```bash
+./scripts/run-demo.sh --skip-build
+```
+
+시연 옵션은 그대로 launch 인자로 넘길 수 있습니다.
+
+```bash
+./scripts/run-demo.sh random_seed:=17
+./scripts/run-demo.sh rviz:=false
+./scripts/run-demo.sh dynamic_obstacle:=false
+```
+
+시연 중 확인할 장면은 다음과 같습니다.
+
+1. Gazebo: 컨베이어 물품 공급, 흡착식 로봇팔 Pick & Place, A/B/C 박스 운송
+2. RViz2: `/scan`, `/amcl_pose`, `/global_costmap/costmap`,
+   `/local_costmap/costmap`, `/plan`
+3. 대시보드: `http://127.0.0.1:8080`의 공정 상태와 박스별 배송 상태
+4. 성공 판정: `/factory/state` 또는 대시보드에서 `DELIVERED` 확인
+
 기본 실행은 Gazebo와 함께 RViz2도 열고, B 박스의 첫 주행 구간 근처에서
 짧게 움직이는 동적 팔레트 장애물 데모를 켭니다. RViz2에서는 `/scan`, `/amcl_pose`,
 `/global_costmap/costmap`, `/local_costmap/costmap`, `/plan`을 확인하면
